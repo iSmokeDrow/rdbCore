@@ -1,0 +1,13 @@
+G:\GitHub\rMOD\rdbCore\bin\Release\rdbCore.dll
+G:\GitHub\rMOD\rdbCore\bin\Release\rdbCore.pdb
+G:\GitHub\rMOD\rdbCore\bin\Release\MoonSharp.Interpreter.dll
+G:\GitHub\rMOD\rdbCore\obj\Release\rdbCore.dll
+G:\GitHub\rMOD\rdbCore\obj\Release\rdbCore.pdb
+G:\GitHub\rMOD\rdbCore\obj\Release\rdbCore.csprojResolveAssemblyReference.cache
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\bin\Release\rdbCore.dll
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\bin\Release\rdbCore.pdb
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\bin\Release\MoonSharp.Interpreter.dll
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\obj\Release\rdbCore.csprojResolveAssemblyReference.cache
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\obj\Release\rdbCore.csproj.CoreCompileInputs.cache
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\obj\Release\rdbCore.dll
+C:\Users\csorrels\Documents\GitHub\rMOD\rdbCore\obj\Release\rdbCore.pdb
