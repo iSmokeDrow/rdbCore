@@ -42,8 +42,12 @@ namespace rdbCore.Structures
                             _length = 4;
                             break;
 
-                        case "long":
+                        case "uint":
                             _length = 4;
+                            break;
+
+                        case "long":
+                            _length = 8;
                             break;
 
                         case "short":

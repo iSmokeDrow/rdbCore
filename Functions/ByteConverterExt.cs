@@ -8,6 +8,16 @@ namespace rdbCore.Functions
 {
     public class ByteConverterExt
     {
+        public static decimal ByteArrayToDecimal(byte[] src, int offset)
+        {
+            var i1 = BitConverter.ToInt32(src, offset);
+            var i2 = BitConverter.ToInt32(src, offset + 4);
+            var i3 = BitConverter.ToInt32(src, offset + 8);
+            var i4 = BitConverter.ToInt32(src, offset + 12);
+
+            return new decimal(new int[] { i1, i2, i3, i4 });
+        }
+
         public static string ToString(byte[] b, Encoding encoding)
         {
             int num = 0;

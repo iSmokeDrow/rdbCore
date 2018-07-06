@@ -7,50 +7,55 @@ namespace rdbCore.Structures
 {
     public class Row : IEnumerable
     {
-        internal List<Cell> Cells = new List<Cell>();
-        public Row(List<LuaField> fields) { for (int i = 0; i < fields.Count; i++) { Cells.Add(new Cell() { Info = fields[i] }); } }
+        internal List<Cell> cells = new List<Cell>();
+
+        public Row() { }
+
+        public Row(List<LuaField> fields) { for (int i = 0; i < fields.Count; i++) { cells.Add(new Cell() { Info = fields[i] }); } }
 
         public object this[string key]
         {
-            get { return Cells.Find(f => f.Info.Name == key).Value; }
-            set { Cells.Find(f => f.Info.Name == key).Value = value; }
+            get { return cells.Find(f => f.Info.Name == key).Value; }
+            set { cells.Find(f => f.Info.Name == key).Value = value; }
         }
 
-        public Cell this[CellType key] { get { return Cells.Find(f => f.Type == Enum.GetName(typeof(CellType), key).ToLower()); } }
+        public Cell this[CellType key] { get { return cells.Find(f => f.Type == Enum.GetName(typeof(CellType), key).ToLower()); } }
 
         public object this[int idx]
         {
-            get { return Cells[idx].Value; }
-            set { Cells[idx].Value = value; }
+            get { return cells[idx].Value; }
+            set { cells[idx].Value = value; }
         }
 
-        public List<Cell> GetBitFromVectorFields(string fieldName) { return Cells.FindAll(f => f.Info.Type == "bitfromvector" && f.Info.BitsName == fieldName); }
+        public List<Cell> GetBitFromVectorFields(string fieldName) { return cells.FindAll(f => f.Info.Type == "bitfromvector" && f.Info.BitsName == fieldName); }
 
-        public int Count { get { return Cells.Count; } }
+		public void Clear() { foreach (Cell cell in cells) { cell.Value = null; } }
 
-        public int IdxByFlag(string flag) { return Cells.FindIndex(f => f.Info.Flag == flag); }
+        public int Count { get { return cells.Count; } }
 
-        public string KeyByFlag(string flag) { return Cells.Find(f => f.Info.Flag == flag).Info.Name; }
+        public int IdxByFlag(string flag) { return cells.FindIndex(f => f.Info.Flag == flag); }
 
-        public object ValueByFlag(string flag) { return Cells.Find(f => f.Info.Flag == flag).Value; }
+        public string KeyByFlag(string flag) { return cells.Find(f => f.Info.Flag == flag).Info.Name; }
 
-        public Cell GetCell(int idx) { return Cells[idx]; }
+        public object ValueByFlag(string flag) { return cells.Find(f => f.Info.Flag == flag).Value; }
 
-        public bool KeyIsDuplicate(string key) { return Cells.FindAll(f => f.Info.Name == key).Count > 1; }
+        public Cell GetCell(int idx) { return cells[idx]; }
 
-        public int GetLength(string key) { return Cells.Find(f => f.Info.Name == key).Info.Length; }
+        public bool KeyIsDuplicate(string key) { return cells.FindAll(f => f.Info.Name == key).Count > 1; }
 
-        public int GetLength(int idx) { return Cells[idx].Info.Length; }
+        public int GetLength(string key) { return cells.Find(f => f.Info.Name == key).Info.Length; }
 
-        public int GetPosition(string key) { return Cells.Find(f => f.Info.Name == key).Info.Position; }
+        public int GetLength(int idx) { return cells[idx].Info.Length; }
 
-        public int GetPosition(int idx) { return Cells[idx].Info.Position; }
+        public int GetPosition(string key) { return cells.Find(f => f.Info.Name == key).Info.Position; }
 
-        public BitVector32 GetBitVector(string key) { return (BitVector32)Cells.Find(f => f.Info.Name == key).Value; }
+        public int GetPosition(int idx) { return cells[idx].Info.Position; }
 
-        public int GetStringLen(string key) { return (int)Cells.Find(f => f.Info.Name == key && f.Info.Type == "stringlen").Value; }
+        public BitVector32 GetBitVector(string key) { return (BitVector32)cells.Find(f => f.Info.Name == key).Value; }
 
-        public string GetStringByLenValue(string key) { return Cells.Find(f => f.Info.Name == key && f.Info.Type == "stringbylen").Value.ToString(); }
+        public int GetStringLen(string key) { return (int)cells.Find(f => f.Info.Name == key && f.Info.Type == "stringlen").Value; }
+
+        public string GetStringByLenValue(string key) { return cells.Find(f => f.Info.Name == key && f.Info.Type == "stringbylen").Value.ToString(); }
 
         /// <summary>
         /// In the case of a field that has a duplicate such db_item (item_use_flag) search for and return the 
@@ -58,21 +63,21 @@ namespace rdbCore.Structures
         /// </summary>
         /// <param name="key">Name of the duplicated field</param>
         /// <returns>The value of the duplicated field that is shown</returns>
-        public int GetShownValue(string key) { return (int)Cells.Find(f => f.Info.Name == key).Value; }
+        public int GetShownValue(string key) { return (int)cells.Find(f => f.Info.Name == key).Value; }
 
-        public object GetRefName(string key) { return Cells.Find(f => f.Info.Name == key).Info.RefName; }
+        public object GetRefName(string key) { return cells.Find(f => f.Info.Name == key).Info.RefName; }
         
-        public object GetRefName(int idx) { return Cells[idx].Info.RefName; }
+        public object GetRefName(int idx) { return cells[idx].Info.RefName; }
 
-        public object GetRefValue(string ref_field) { return Cells.Find(f => f.Name == ref_field).Value; }
+        public object GetRefValue(string ref_field) { return cells.Find(f => f.Name == ref_field).Value; }
 
-        public bool ContainsDuplicate(string key) { return Cells.FindAll(f => f.Info.Name == key).Count > 1; }
+        public bool ContainsDuplicate(string key) { return cells.FindAll(f => f.Info.Name == key).Count > 1; }
 
         #region IEnumerable Interface
 
         IEnumerator IEnumerable.GetEnumerator() { return GetEnumerator(); }
 
-        public CellsEnum GetEnumerator() { return new CellsEnum(Cells); }
+        public CellsEnum GetEnumerator() { return new CellsEnum(cells); }
 
         #endregion
     }

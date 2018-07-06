@@ -58,11 +58,17 @@ namespace rdbCore
 
         public List<LuaField> FieldList { get { return fieldList; } }
 
+        public List<LuaField> HeaderList { get { return (UseHeader) ? luaIO.GetFieldList("header") : null; } }
+
         public LuaField GetField(int idx) { return fieldList[idx]; }
 
         public LuaField GetField(string name) { return fieldList.Find(f => f.Name == name); }
 
         public int GetFieldIdx(string name) { return fieldList.FindIndex(f => f.Name == name); }
+
+        public string FileName { get { return luaIO.FileName; } }
+
+        public string TableName { get { return luaIO.TableName; } }
 
         public bool UseRowProcesser { get { return luaIO.UseRowProcessor; } }
 
@@ -73,6 +79,20 @@ namespace rdbCore
         public string SelectStatement { get { return luaIO.SelectStatement; } }
 
         public bool UseSqlColumns {  get { return luaIO.UseSqlColumns; } }
+       
+        public string SqlColumns
+        {
+            get
+            {
+                string ret = string.Empty;
+                List<string> columns = luaIO.SqlColumns;
+
+                for (int i = 0; i < columns.Count; i++) { ret += string.Format("{0},\n", columns[i]); }
+                ret = ret.Remove(ret.Length - 3, 3);
+
+                return ret;
+            }
+        }
 
         public SqlCommand InsertStatement
         {
@@ -136,7 +156,7 @@ namespace rdbCore
                                 break;
 
                             case "double":
-                                paramType = SqlDbType.BigInt;
+                                paramType = SqlDbType.Float;
                                 break;
 
                             case "string":
@@ -162,61 +182,65 @@ namespace rdbCore
                     {
                         LuaField field = fieldList[colIdx];
 
-                        columns += string.Format("{0}{1},", field.Name, string.Empty);
-                        parameters += string.Format("@{0}{1},", field.Name, string.Empty);
-                        SqlDbType paramType = SqlDbType.Int;
-
-                        switch (field.Type)
+                        if (field.Show)
                         {
-                            case "short":
-                                paramType = SqlDbType.SmallInt;
-                                break;
+                            columns += string.Format("{0}{1},", field.Name, string.Empty);
+                            parameters += string.Format("@{0}{1},", field.Name, string.Empty);
+                            SqlDbType paramType = SqlDbType.Int;
 
-                            case "ushort":
-                                paramType = SqlDbType.SmallInt;
-                                break;
+                            switch (field.Type)
+                            {
+                                case "short":
+                                    paramType = SqlDbType.SmallInt;
+                                    break;
 
-                            case "int":
-                                paramType = SqlDbType.Int;
-                                break;
+                                case "ushort":
+                                    paramType = SqlDbType.SmallInt;
+                                    break;
 
-                            case "uint":
-                                paramType = SqlDbType.Int;
-                                break;
+                                case "int":
+                                    paramType = SqlDbType.Int;
+                                    break;
 
-                            case "long":
-                                paramType = SqlDbType.BigInt;
-                                break;
+                                case "uint":
+                                    paramType = SqlDbType.Int;
+                                    break;
 
-                            case "byte":
-                                paramType = SqlDbType.TinyInt;
-                                break;
+                                case "long":
+                                    paramType = SqlDbType.BigInt;
+                                    break;
 
-                            case "datetime":
-                                paramType = SqlDbType.DateTime;
-                                break;
+                                case "byte":
+                                    paramType = SqlDbType.TinyInt;
+                                    break;
 
-                            case "decimal":
-                                paramType = SqlDbType.Decimal;
-                                break;
+                                case "datetime":
+                                    paramType = SqlDbType.DateTime;
+                                    break;
 
-                            case "single":
-                                paramType = SqlDbType.Float;
-                                break;
+                                case "decimal":
+                                    paramType = SqlDbType.Decimal;
+                                    break;
 
-                            case "double":
-                                paramType = SqlDbType.BigInt;
-                                break;
+                                case "single":
+                                    paramType = SqlDbType.Float;
+                                    break;
 
-                            case "string":
-                                paramType = SqlDbType.NVarChar;
-                                break;
+                                case "double":
+                                    paramType = SqlDbType.Float;
+                                    break;
 
-                            case "stringbyref":
-                                paramType = SqlDbType.VarChar;
-                                break;
+                                case "string":
+                                    paramType = SqlDbType.NVarChar;
+                                    break;
+
+                                case "stringbyref":
+                                    paramType = SqlDbType.VarChar;
+                                    break;
+                            }
+                            sqlCmd.Parameters.Add(field.Name, paramType);
+
                         }
-                        sqlCmd.Parameters.Add(field.Name, paramType);
 
                         if (((colIdx * 100) / colCount) != ((colIdx - 1) * 100 / colCount)) { OnProgressValueChanged(new ProgressValueArgs(colIdx)); }
                     }
@@ -237,6 +261,10 @@ namespace rdbCore
         public Row GetRow(int idx) { return (Row)data[idx]; }
 
         public int RowCount { get { return data.Count; } }
+
+        public bool ReadHeader { get { return (luaIO != null) ? luaIO.ReadHeader : false; } }
+
+        public bool UseHeader {  get { return (luaIO != null) ? luaIO.UseHeader : false; } }
 
         public string CreatedDate { get { return date; } }
 
@@ -308,7 +336,7 @@ namespace rdbCore
                                     int loopCount = BitConverter.ToInt32(buffer, 0);
                                     for (int i = 0; i < loopCount; i++)
                                     {
-                                        Row currentRow = readRow(ms, null);
+                                        Row currentRow = readRow(ms);
                                         if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
                                         data.Add(currentRow);
                                         if (((rowIdx * 100) / RowCount) != ((rowIdx - 1) * 100 / RowCount)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
@@ -324,7 +352,7 @@ namespace rdbCore
 
                         for (int rowIdx = 0; rowIdx < rowCnt; rowIdx++)
                         {
-                            Row currentRow = readRow(ms, null);
+                            Row currentRow = readRow(ms);
                             if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
                             data.Add(currentRow);
 
@@ -353,7 +381,7 @@ namespace rdbCore
 
                     switch (Case)
                     {
-                        case "doubleloop":
+                        case "doubleloop": // TODO: Needs analysis, corruption occurs.
 
                             int previousVal = 0;
                             int loopCount = 0;
@@ -472,91 +500,93 @@ namespace rdbCore
             return header;
         }
 
-        private Row readRow(MemoryStream ms, Row row)
+        private Row readRow(MemoryStream ms)
         {
-            Row currentRow = (row == null) ? new Row(fieldList) : row;
+            Row row = new Row(FieldList);
 
-            for (int fieldIdx = 0; fieldIdx < currentRow.Count; fieldIdx++)
+            for (int fieldIdx = 0; fieldIdx < row.Count; fieldIdx++)
             {
                 LuaField currentField = GetField(fieldIdx);
 
                 switch (currentField.Type)
                 {
                     case "short":
-                        currentRow[fieldIdx] = BitConverter.ToInt16(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToInt16(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "ushort":
-                        currentRow[fieldIdx] = BitConverter.ToUInt16(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToUInt16(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "int":
-                        currentRow[fieldIdx] = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "uint":
-                        currentRow[fieldIdx] = BitConverter.ToUInt32(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToUInt32(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "long":
-                        currentRow[fieldIdx] = BitConverter.ToUInt64(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToUInt64(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "byte":
-                        currentRow[fieldIdx] = (int)readStream(ms, currentField.Length)[0];
+                        row[fieldIdx] = (int)readStream(ms, currentField.Length)[0];
                         break;
 
                     case "bitvector":
-                        currentRow[fieldIdx] = new BitVector32(BitConverter.ToInt32(readStream(ms, currentField.Length), 0));
+                        row[fieldIdx] = new BitVector32(BitConverter.ToInt32(readStream(ms, currentField.Length), 0));
                         break;
 
                     case "bitfromvector":
-                        int bitPos = currentRow.GetPosition(fieldIdx);
-                        BitVector32 bitVector = currentRow.GetBitVector(currentField.BitsName);
-                        currentRow[fieldIdx] = Convert.ToInt32(bitVector[1 << bitPos]);
+                        int bitPos = row.GetPosition(fieldIdx);
+                        BitVector32 bitVector = row.GetBitVector(currentField.BitsName);
+                        row[fieldIdx] = Convert.ToInt32(bitVector[1 << bitPos]);
                         break;
 
                     case "datetime":
                         int val = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
-                        currentRow[fieldIdx] = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(val);
+                        row[fieldIdx] = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(val);
                         break;
 
                     case "decimal":
-                        currentRow[fieldIdx] = BitConverter.ToInt32(readStream(ms, currentField.Length), 0) / 100;
+                        int v0 = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
+                        decimal v1 = v0 / 100m;
+                        row[fieldIdx] = v1;
                         break;
 
                     case "single":
-                        currentRow[fieldIdx] = BitConverter.ToSingle(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToSingle(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "double":
-                        currentRow[fieldIdx] = BitConverter.ToDouble(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToDouble(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "sid":
-                        currentRow[fieldIdx] = RowCount;
+                        row[fieldIdx] = RowCount;
                         break;
 
                     case "string":
-                        currentRow[fieldIdx] = ByteConverterExt.ToString(readStream(ms, currentField.Length), Encoding);
+                        row[fieldIdx] = ByteConverterExt.ToString(readStream(ms, currentField.Length), Encoding);
                         break;
 
                     case "stringlen":
-                        currentRow[fieldIdx] = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
+                        row[fieldIdx] = BitConverter.ToInt32(readStream(ms, currentField.Length), 0);
                         break;
 
                     case "stringbylen":
-                        currentRow[fieldIdx] = ByteConverterExt.ToString(readStream(ms, currentRow.GetStringLen(currentField.Name)), Encoding);
+                        row[fieldIdx] = ByteConverterExt.ToString(readStream(ms, row.GetStringLen(currentField.Name)), Encoding);
                         break;
 
                     case "stringbyref":
                         int refLen = (int)header.GetRefValue(currentField.RefName);
-                        currentRow[fieldIdx] = ByteConverterExt.ToString(readStream(ms, refLen), Encoding);
+                        row[fieldIdx] = ByteConverterExt.ToString(readStream(ms, refLen), Encoding);
                         break;
                 }
             }
 
-            return currentRow;
+            return row;
         }
 
         private void writeHeader(MemoryStream ms, HeaderType type)
@@ -644,7 +674,7 @@ namespace rdbCore
                         break;
 
                     case "long":
-                        ms.Write(BitConverter.GetBytes((long)currentRow[fieldIdx]), 0, currentField.Length);
+                        ms.Write(BitConverter.GetBytes(Convert.ToInt64(currentRow[fieldIdx])), 0, currentField.Length);
                         break;
 
                     case "byte":
@@ -664,7 +694,9 @@ namespace rdbCore
                         break;
 
                     case "decimal":
-                        ms.Write(BitConverter.GetBytes(Convert.ToInt32(currentRow[fieldIdx]) * 100), 0, currentField.Length);
+                        decimal v0 = Convert.ToDecimal(currentRow[fieldIdx]);
+                        int v1 = Convert.ToInt32(v0 * 100);
+                        ms.Write(BitConverter.GetBytes(v1), 0, currentField.Length);
                         break;
 
                     case "single":

@@ -18,6 +18,24 @@ namespace rdbCore
             UserData.RegisterType<Row>();
         }
 
+        public string FileName
+        {
+            get
+            {
+                var name = engine.Globals["fileName"];
+                return (name != null) ? name.ToString() : null;
+            }
+        }
+
+        public string TableName
+        {
+            get
+            {
+                var name = engine.Globals["tableName"];
+                return (name != null) ? name.ToString() : null;
+            }
+        }
+
         public bool UseRowProcessor { get { return engine.Globals["ProcessRow"] != null; } }
 
         public bool UseSelectStatement { get { return engine.Globals["selectStatement"] != null; } }
@@ -114,33 +132,30 @@ namespace rdbCore
         public List<LuaField> GetFieldList(string tableName)
         {
             List<LuaField> lFields = new List<LuaField>();
+
             DynValue res = engine.DoString(scriptCode);
 
-            try
+            Table t = (Table)engine.Globals[tableName];
+
+            for (int tIdx = 1; tIdx < t.Length + 1; tIdx++)
             {
-                Table t = (Table)engine.Globals[tableName];
+                Table fieldT = t.Get(tIdx).Table;
+                LuaField lField = new LuaField();
 
-                for (int tIdx = 1; tIdx < t.Length + 1; tIdx++)
-                {
-                    Table fieldT = t.Get(tIdx).Table;
-                    LuaField lField = new LuaField();
+                lField.Name = fieldT.Get(1).String;
+                lField.Type = fieldT.Get(2).String;
+                lField.BitsName = fieldT.Get("bits_field").String;
+                lField.RefName = fieldT.Get("ref_field").String;
+                lField.Length = (int)fieldT.Get("length").Number;
+                lField.Default = (object)fieldT.Get("default").ToObject();
+                lField.Position = (int)fieldT.Get("bit_position").Number;
+                lField.Flag = fieldT.Get("flag").String;
+                bool showVal = (fieldT.Get("show").ToObject() != null) ? Convert.ToBoolean(fieldT.Get("show").Number) : true;
+                if (lField.Type == "stringlen") { showVal = false; }
+                lField.Show = showVal;
 
-                    lField.Name = fieldT.Get(1).String;
-                    lField.Type = fieldT.Get(2).String;
-                    lField.BitsName = fieldT.Get("bits_field").String;
-                    lField.RefName = fieldT.Get("ref_field").String;
-                    lField.Length = (int)fieldT.Get("length").Number;
-                    lField.Default = (object)fieldT.Get("default").ToObject();
-                    lField.Position = (int)fieldT.Get("bit_position").Number;
-                    lField.Flag = fieldT.Get("flag").String;
-                    bool showVal = (fieldT.Get("show").ToObject() != null) ? Convert.ToBoolean(fieldT.Get("show").Number) : true;
-                    if (lField.Type == "stringlen") { showVal = false; }
-                    lField.Show = showVal;
-
-                    lFields.Add(lField);
-                }
+                lFields.Add(lField);
             }
-            catch (SyntaxErrorException sEX) { throw new Exception(sEX.Message, sEX.InnerException); }
 
             return lFields;
         }
