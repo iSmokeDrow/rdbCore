@@ -381,48 +381,36 @@ namespace rdbCore
 
                     switch (Case)
                     {
-                        case "doubleloop": // TODO: Needs analysis, corruption occurs.
+                        case "doubleloop":
 
                             int previousVal = 0;
-                            int loopCount = 0;
-                            int subLoopCount = 0;
-
-                            for (int rowIdx = 0; rowIdx < RowCount; rowIdx++)
-                            {
-                                int currentVal = (int)((Row)data[rowIdx]).ValueByFlag("loopcounter");
-                                if (previousVal != currentVal) { previousVal = currentVal; loopCount++; }
-                            }
-
-                            buffer = BitConverter.GetBytes(loopCount);
-                            ms.Write(buffer, 0, buffer.Length);
-
-                            previousVal = 0;
 
                             for (int rowIdx = 0; rowIdx < RowCount; rowIdx++)
                             {
                                 Row currentRow = (Row)data[rowIdx];
-                                string currentValKey = currentRow.KeyByFlag("loopcounter");
                                 int currentVal = (int)currentRow.ValueByFlag("loopcounter");
                                 if (previousVal != currentVal)
                                 {
-                                    foreach (Row row in data) { if ((int)row[currentValKey] == currentVal) { subLoopCount++; } }
-                                    previousVal = currentVal;
+                                    List<Row> rows = data.FindAll(r => (int)r[0] == currentVal);
 
-                                    buffer = BitConverter.GetBytes(subLoopCount);
+                                    buffer = BitConverter.GetBytes(rows.Count);
                                     ms.Write(buffer, 0, buffer.Length);
-                                }
 
-                                if (UseRowProcesser) { CallRowProcessor("write", currentRow, rowIdx); }
-                                writeRow(ms, currentRow);
-                                if (((rowIdx * 100) / RowCount) != ((rowIdx - 1) * 100 / RowCount)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
+                                    for (int filteredIdx = 0; filteredIdx < rows.Count; filteredIdx++)
+                                    {
+                                        if (UseRowProcesser) { CallRowProcessor("write", rows[filteredIdx], rowIdx); }
+                                        writeRow(ms, rows[filteredIdx]);
+                                    }
+
+                                    previousVal = currentVal;
+                                }
                             }
 
                             break;
                     }
                 }
                 else
-                {
-                    
+                {                  
                     for (int rowIdx = 0; rowIdx < RowCount; rowIdx++)
                     {
                         Row currentRow = data[rowIdx];
@@ -599,7 +587,27 @@ namespace rdbCore
                     byte[] date = this.Encoding.GetBytes(string.Format("{0}{1}{2}", DateTime.Now.Year, GetDate(DateTime.Now.Month), GetDate(DateTime.Now.Day)));
                     for (int i = 0; i < date.Length; i++) { tmpHeader[i] = date[i]; }
                     ms.Write(tmpHeader, 0, tmpHeader.Length);
-                    ms.Write(BitConverter.GetBytes(RowCount), 0, 4);
+                    if (SpecialCase)
+                    {
+                        switch (Case)
+                        {
+                            case "doubleloop":
+                                byte[] buffer;
+                                int previousVal = 0;
+                                int loopCount = 0;
+
+                                for (int rowIdx = 0; rowIdx < RowCount; rowIdx++)
+                                {
+                                    int currentVal = (int)((Row)data[rowIdx]).ValueByFlag("loopcounter");
+                                    if (previousVal != currentVal) { previousVal = currentVal; loopCount++; }
+                                }
+
+                                buffer = BitConverter.GetBytes(loopCount);
+                                ms.Write(buffer, 0, buffer.Length);
+                                break;
+                        }
+                    }
+                    else { ms.Write(BitConverter.GetBytes(RowCount), 0, 4); }
 
                     break;
 
