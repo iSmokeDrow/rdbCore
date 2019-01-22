@@ -144,12 +144,13 @@ namespace rdbCore
 
                 lField.Name = fieldT.Get(1).String;
                 lField.Type = fieldT.Get(2).String;
-                lField.BitsName = fieldT.Get("bits_field").String;
-                lField.RefName = fieldT.Get("ref_field").String;
+                lField.BitsName = fieldT.Get("bits_field").String; // TODO: Change me to dependency
+                lField.RefName = fieldT.Get("ref_field").String; // TODO: Change me to dependency
                 lField.Length = (int)fieldT.Get("length").Number;
                 lField.Default = (object)fieldT.Get("default").ToObject();
                 lField.Position = (int)fieldT.Get("bit_position").Number;
                 lField.Flag = fieldT.Get("flag").String;
+                lField.Dependency = fieldT.Get("dependency").String;
                 bool showVal = (fieldT.Get("show").ToObject() != null) ? Convert.ToBoolean(fieldT.Get("show").Number) : true;
                 if (lField.Type == "stringlen") { showVal = false; }
                 lField.Show = showVal;

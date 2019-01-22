@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Text;
 using System.IO;
+using System.Threading.Tasks;
 using rdbCore.Functions;
 using rdbCore.Structures;
 
@@ -22,6 +23,8 @@ namespace rdbCore
         protected Row header;
         protected List<Row> data = new List<Row>();
         protected LUA luaIO;
+
+        private List<Cell> rowCells;
 
 
         #endregion
@@ -50,25 +53,25 @@ namespace rdbCore
 
         #endregion
 
-        #region Get Methods
+        #region Public Propeerties
+
+        public string FileName { get { return luaIO.FileName; } }
+
+        public string TableName { get { return luaIO.TableName; } }
+
+        public string CreatedDate { get { return date; } }
+
+        public string Case { get { return luaIO.Case; } }
+
+        public string Extension { get { return (luaIO.UseExt) ? luaIO.Ext : "rdb"; } }
 
         public List<Row> Data { get { return data; } }
 
         public int FieldCount { get { return fieldList.Count; } }
 
-        public List<LuaField> FieldList { get { return fieldList; } }
-
         public List<LuaField> HeaderList { get { return (UseHeader) ? luaIO.GetFieldList("header") : null; } }
 
-        public LuaField GetField(int idx) { return fieldList[idx]; }
-
-        public LuaField GetField(string name) { return fieldList.Find(f => f.Name == name); }
-
-        public int GetFieldIdx(string name) { return fieldList.FindIndex(f => f.Name == name); }
-
-        public string FileName { get { return luaIO.FileName; } }
-
-        public string TableName { get { return luaIO.TableName; } }
+        public List<LuaField> FieldList { get { return fieldList; } }
 
         public bool UseRowProcesser { get { return luaIO.UseRowProcessor; } }
 
@@ -254,31 +257,15 @@ namespace rdbCore
             }
         }
 
-        public string Case { get { return luaIO.Case; } } 
-
-        public string Extension { get { return (luaIO.UseExt) ? luaIO.Ext : "rdb"; } }
-
-        public Row GetRow(int idx) { return (Row)data[idx]; }
-
         public int RowCount { get { return data.Count; } }
 
         public bool ReadHeader { get { return (luaIO != null) ? luaIO.ReadHeader : false; } }
 
         public bool UseHeader {  get { return (luaIO != null) ? luaIO.UseHeader : false; } }
 
-        public string CreatedDate { get { return date; } }
-
         #endregion
 
         #region Methods (Public)
-
-        internal void CallRowProcessor(string mode, Row row, int rowCount) { luaIO.CallRowProcessor(mode, row, rowCount); }
-
-        public void SetEncoding(Encoding encoding) { this.Encoding = encoding; }
-
-        public void SetData(List<Row> data) { this.data = data; }
-
-        public void ClearData() { data.Clear(); }
 
         public void Initialize(string structurePath)
         {
@@ -287,85 +274,107 @@ namespace rdbCore
             if (luaIO.UseHeader) { header = new Row(luaIO.GetFieldList("header")); }
         }
 
-        public void ParseRDB(string rdbPath)
+        public Row GetRow(int idx) { return (Row)data[idx]; }
+
+        public LuaField GetField(int idx) { return fieldList[idx]; }
+
+        public LuaField GetField(string name) { return fieldList.Find(f => f.Name == name); }
+
+        public int GetFieldIdx(string name) { return fieldList.FindIndex(f => f.Name == name); }
+
+        public void CallRowProcessor(string mode, Row row, int rowCount) { luaIO.CallRowProcessor(mode, row, rowCount); }
+
+        public void SetEncoding(Encoding encoding) { this.Encoding = encoding; }
+
+        public void SetData(List<Row> data) { this.data = data; }
+
+        public void ClearData() { data.Clear(); }
+
+        void parseBuffer(byte[] fileBytes)
         {
-            int rowCnt = 0;
-
-            if (File.Exists(rdbPath))
+            using (MemoryStream ms = new MemoryStream(fileBytes, false))
             {
-                using (MemoryStream ms = new MemoryStream(File.ReadAllBytes(rdbPath)))
+                int rowCnt = 0;
+
+                byte[] buffer = new byte[0];
+
+                if (luaIO.UseHeader)
                 {
-                    byte[] buffer = new byte[0];
+                    header = readHeader(ms);
+                    rowCnt = (int)header.ValueByFlag("rowcount");
+                    // TODO: Define 'date' by reading actual info (if present)
+                    date = string.Format("{0}{1}{2}", DateTime.Now.Year, GetDate(DateTime.Now.Month), GetDate(DateTime.Now.Day));
+                }
+                else
+                {
+                    buffer = new byte[8];
+                    ms.Read(buffer, 0, buffer.Length);
 
-                    if (luaIO.UseHeader)
-                    {
-                        header = readHeader(ms);
-                        rowCnt = (int)header.ValueByFlag("rowcount");
-                        // TODO: Define 'date' by reading actual info (if present)
-                        date = string.Format("{0}{1}{2}", DateTime.Now.Year, GetDate(DateTime.Now.Month), GetDate(DateTime.Now.Day));
-                    }
-                    else
-                    {
-                        buffer = new byte[8];
-                        ms.Read(buffer, 0, buffer.Length);
+                    date = this.Encoding.GetString(buffer);
 
-                        date = this.Encoding.GetString(buffer);
+                    ms.Position += 120;
 
-                        ms.Position += 120;
-
-                        // Read the row count
-                        buffer = new byte[4];
-                        ms.Read(buffer, 0, buffer.Length);
-                        rowCnt = BitConverter.ToInt32(buffer, 0);
-                    }
-                    
-       
-                    if (SpecialCase)
-                    {
-                        OnProgressMaxChanged(new ProgressMaxArgs(rowCnt));
-
-                        switch (Case)
-                        {
-                            case "doubleloop":
-
-                                for (int rowIdx = 0; rowIdx < rowCnt; rowIdx++)
-                                {
-                                    buffer = new byte[4];
-                                    ms.Read(buffer, 0, buffer.Length);
-
-                                    int loopCount = BitConverter.ToInt32(buffer, 0);
-                                    for (int i = 0; i < loopCount; i++)
-                                    {
-                                        Row currentRow = readRow(ms);
-                                        if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
-                                        data.Add(currentRow);
-                                        if (((rowIdx * 100) / RowCount) != ((rowIdx - 1) * 100 / RowCount)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
-                                    }
-                                }
-
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        OnProgressMaxChanged(new ProgressMaxArgs(rowCnt));
-
-                        for (int rowIdx = 0; rowIdx < rowCnt; rowIdx++)
-                        {
-                            Row currentRow = readRow(ms);
-                            if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
-                            data.Add(currentRow);
-
-                            if (((rowIdx * 100) / rowCnt) != ((rowIdx - 1) * 100 / rowCnt)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
-                        }
-                    }                  
+                    // Read the row count
+                    buffer = new byte[4];
+                    ms.Read(buffer, 0, buffer.Length);
+                    rowCnt = BitConverter.ToInt32(buffer, 0);
                 }
 
-                OnProgressMaxChanged(new ProgressMaxArgs(100));
-                OnProgressValueChanged(new ProgressValueArgs(0));
+                if (SpecialCase)
+                {
+                    OnProgressMaxChanged(new ProgressMaxArgs(rowCnt));
+
+                    switch (Case)
+                    {
+                        case "doubleloop":
+
+                            for (int rowIdx = 0; rowIdx < rowCnt; rowIdx++)
+                            {
+                                buffer = new byte[4];
+                                ms.Read(buffer, 0, buffer.Length);
+
+                                int loopCount = BitConverter.ToInt32(buffer, 0);
+                                for (int i = 0; i < loopCount; i++)
+                                {
+                                    Row currentRow = readRow(ms);
+                                    if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
+                                    data.Add(currentRow);
+                                    if (((rowIdx * 100) / RowCount) != ((rowIdx - 1) * 100 / RowCount)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
+                                }
+                            }
+
+                            break;
+                    }
+                }
+                else
+                {
+                    OnProgressMaxChanged(new ProgressMaxArgs(rowCnt));
+
+                    for (int rowIdx = 0; rowIdx < rowCnt; rowIdx++)
+                    {
+                        Row currentRow = readRow(ms);
+                        if (UseRowProcesser) { CallRowProcessor("read", currentRow, rowIdx); }
+                        data.Add(currentRow);
+
+                        if (((rowIdx * 100) / rowCnt) != ((rowIdx - 1) * 100 / rowCnt)) { OnProgressValueChanged(new ProgressValueArgs(rowIdx)); }
+                    }
+                }
+            }
+
+            OnProgressMaxChanged(new ProgressMaxArgs(100));
+            OnProgressValueChanged(new ProgressValueArgs(0));
+        }
+
+        public void ParseRDB(string rdbPath)
+        {
+            if (File.Exists(rdbPath))
+            {
+                parseBuffer(File.ReadAllBytes(rdbPath));
             }
             else { throw new FileNotFoundException("Cannot find file specified", rdbPath); }
         }
+
+        public void ParseRDB(byte[] fileBytes) { parseBuffer(fileBytes); }
 
         public void WriteRDB(string buildPath)
         {
@@ -450,7 +459,6 @@ namespace rdbCore
             return buffer;
         }
 
-        // TODO: Move me to using readRow
         private Row readHeader(MemoryStream ms)
         {
             Row header = new Row(luaIO.GetFieldList("header"));
@@ -490,7 +498,7 @@ namespace rdbCore
 
         private Row readRow(MemoryStream ms)
         {
-            Row row = new Row(FieldList);
+            Row row = new Row(fieldList);
 
             for (int fieldIdx = 0; fieldIdx < row.Count; fieldIdx++)
             {
@@ -564,7 +572,15 @@ namespace rdbCore
                         break;
 
                     case "stringbylen":
-                        row[fieldIdx] = ByteConverterExt.ToString(readStream(ms, row.GetStringLen(currentField.Name)), Encoding);
+                        {
+                            int len = 0;
+                            int.TryParse(row[currentField.Dependency].ToString(), out len);
+
+                            if (len < 0)
+                                break;
+                            else
+                                row[fieldIdx] = ByteConverterExt.ToString(readStream(ms, len), Encoding);
+                        }
                         break;
 
                     case "stringbyref":

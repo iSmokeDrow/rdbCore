@@ -84,6 +84,7 @@ namespace rdbCore.Structures
         }
         public int Position { get; set; }
         public string Flag { get; set; }
+        public string Dependency { get; set; }
         public bool Show { get; set; } = true;
     }
 }

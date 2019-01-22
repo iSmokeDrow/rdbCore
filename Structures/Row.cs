@@ -82,17 +82,6 @@ namespace rdbCore.Structures
         #endregion
     }
 
-    public class Cell
-    {
-        internal LuaField Info;
-        
-        public string Name { get { return Info.Name; } }
-        public string Type { get { return Info.Type; } }
-        public int Length { get { return Info.Length; } set { Info.Length = value; } }
-        public object Value { get; set; }
-        public object Default { get { return Info.Default; } }
-    }
-
     public class CellsEnum : IEnumerator
     {
         List<Cell> cells;

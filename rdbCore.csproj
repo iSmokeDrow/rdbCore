@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="Core.cs" />
     <Compile Include="Functions\ByteConverterExt.cs" />
+    <Compile Include="Structures\Cell.cs" />
     <Compile Include="Structures\Enums.cs" />
     <Compile Include="Structures\EventArgs.cs" />
     <Compile Include="LUA.cs" />
